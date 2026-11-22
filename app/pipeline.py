@@ -35,6 +35,7 @@ class Pipeline:
 
         new_topic = summary.tema not in topics
         if new_topic:
+            await self.storage.read("README.md")  # GitHub necesita el sha si el índice ya existe
             index = notes.build_index([*topics, summary.tema])
             await self.storage.write("README.md", index, "índice: nuevo tema")
         return Result(summary, name, notes.count_entries(updated), new_topic)
