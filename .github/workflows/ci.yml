@@ -93,3 +93,58 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+
+  deploy:
+    name: Deploy a AWS
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Credenciales de AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Enviar deploy a la instancia
+        id: send
+        run: |
+          TAG="sha-${GITHUB_SHA::7}"
+          jq -n --arg tag "$TAG" --rawfile script deploy/deploy.sh \
+            '{commands: ["export IMAGE_TAG=\($tag)", $script]}' > params.json
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "liked-in $TAG" \
+            --parameters file://params.json \
+            --query Command.CommandId --output text)
+          echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+          echo "Comando SSM: $CMD_ID"
+
+      - name: Esperar resultado
+        env:
+          CMD_ID: ${{ steps.send.outputs.command_id }}
+        run: |
+          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
+          get() {
+            aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query "$1" --output text
+          }
+          get StandardOutputContent
+          STATUS=$(get Status)
+          echo "Estado: $STATUS"
+          if [ "$STATUS" != "Success" ]; then
+            get StandardErrorContent
+            exit 1
+          fi
