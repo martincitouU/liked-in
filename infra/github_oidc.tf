@@ -17,8 +17,8 @@ resource "aws_iam_role" "deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          # Solo jobs de ESTE repo que usen el environment "production"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:environment:production"
+          # GitHub incluye los IDs inmutables del dueño y del repo (owner@id/repo@id)
+          "token.actions.githubusercontent.com:sub" = "repo:martincitouU@166942942/liked-in@1467210070:environment:production"
         }
       }
     }]
