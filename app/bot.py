@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 from app.fetcher import extract_urls, fetch_post, is_linkedin
 from app.pipeline import Pipeline
-from app.storage import LocalStorage
+from app.storage import make_storage
 from app.summarizer import Summarizer
 
 load_dotenv()
@@ -59,7 +59,7 @@ def main() -> None:
     token = os.environ["TELEGRAM_TOKEN"]
     allowed_user = int(os.environ["ALLOWED_USER_ID"])
     summarizer = Summarizer(os.environ["ANTHROPIC_API_KEY"], os.getenv("LLM_MODEL", "claude-haiku-5-5"))
-    storage = LocalStorage(os.getenv("NOTES_LOCAL_DIR", "salida/notas"))
+    storage = make_storage()
 
     app = Application.builder().token(token).build()
     app.bot_data["pipeline"] = Pipeline(summarizer, storage)
