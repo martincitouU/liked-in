@@ -1,0 +1,6 @@
+services:
+  bot:
+    build: .
+    image: liked-in:local
+    env_file: .env
+    restart: unless-stopped
